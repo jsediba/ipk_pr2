@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-pedantic -Wall -Wextra -g
+CFLAGS=-Wall -Wextra -g
 
 .PHONY: clean
 

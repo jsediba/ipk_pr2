@@ -48,6 +48,7 @@ bool check_if_valid_interface(char *interface)
         tmp = tmp->next;
     }
     pcap_freealldevs(devs);
+
     return found_matching;
 }
 
@@ -107,46 +108,46 @@ void generate_filter_string(char *buffer, sniffer_settings_t *settings)
         {
             if (strlen(buffer) != 0)
             {
-                strncat(buffer, " or ", FILTER_BUFFER_SIZE - strlen(buffer));
+                strncat(buffer, " or ", FILTER_BUFFER_SIZE - strlen(buffer) - 1);
             }
-            strncat(buffer, "(tcp", FILTER_BUFFER_SIZE - strlen(buffer));
+            strncat(buffer, "(tcp", FILTER_BUFFER_SIZE - strlen(buffer) - 1);
             if (settings->port != -1)
             {
-                strncat(buffer, port_buffer, FILTER_BUFFER_SIZE - strlen(buffer));
+                strncat(buffer, port_buffer, FILTER_BUFFER_SIZE - strlen(buffer) - 1);
             }
-            strncat(buffer, ")", FILTER_BUFFER_SIZE - strlen(buffer));
+            strncat(buffer, ")", FILTER_BUFFER_SIZE - strlen(buffer) - 1);
         }
 
         if (settings->udp)
         {
             if (strlen(buffer) != 0)
             {
-                strncat(buffer, " or ", FILTER_BUFFER_SIZE - strlen(buffer));
+                strncat(buffer, " or ", FILTER_BUFFER_SIZE - strlen(buffer) - 1);
             }
-            strncat(buffer, "(udp", FILTER_BUFFER_SIZE - strlen(buffer));
+            strncat(buffer, "(udp", FILTER_BUFFER_SIZE - strlen(buffer) - 1);
             if (settings->port != -1)
             {
-                strncat(buffer, port_buffer, FILTER_BUFFER_SIZE - strlen(buffer));
+                strncat(buffer, port_buffer, FILTER_BUFFER_SIZE - strlen(buffer) - 1);
             }
-            strncat(buffer, ")", FILTER_BUFFER_SIZE - strlen(buffer));
+            strncat(buffer, ")", FILTER_BUFFER_SIZE - strlen(buffer) - 1);
         }
 
         if (settings->icmp)
         {
             if (strlen(buffer) != 0)
             {
-                strncat(buffer, " or ", FILTER_BUFFER_SIZE - strlen(buffer));
+                strncat(buffer, " or ", FILTER_BUFFER_SIZE - strlen(buffer) - 1);
             }
-            strncat(buffer, "icmp or icmp6", FILTER_BUFFER_SIZE - strlen(buffer));
+            strncat(buffer, "icmp or icmp6", FILTER_BUFFER_SIZE - strlen(buffer) - 1);
         }
 
         if (settings->arp)
         {
             if (strlen(buffer) != 0)
             {
-                strncat(buffer, " or ", FILTER_BUFFER_SIZE - strlen(buffer));
+                strncat(buffer, " or ", FILTER_BUFFER_SIZE - strlen(buffer) - 1);
             }
-            strncat(buffer, "arp", FILTER_BUFFER_SIZE - strlen(buffer));
+            strncat(buffer, "arp", FILTER_BUFFER_SIZE - strlen(buffer) - 1);
         }
     }
     else
@@ -154,7 +155,7 @@ void generate_filter_string(char *buffer, sniffer_settings_t *settings)
         if (settings->port != -1)
         {
             snprintf(port_buffer, TMP_BUFFER_SIZE, "port %ld", settings->port);
-            strncat(buffer, port_buffer, FILTER_BUFFER_SIZE - strlen(buffer));
+            strncat(buffer, port_buffer, FILTER_BUFFER_SIZE - strlen(buffer) - 1);
         }
     }
 }
@@ -237,6 +238,170 @@ int parse_args(int argc, char **argv, sniffer_settings_t *settings)
     return 0;
 }
 
+void print_timestamp(struct pcap_pkthdr *header)
+{
+    char timestamp_1[2 * TMP_BUFFER_SIZE] = {0};
+    char timestamp_2[TMP_BUFFER_SIZE] = {0};
+    char timestamp_2_str[TMP_BUFFER_SIZE] = {0};
+    char timestamp_3[TMP_BUFFER_SIZE] = {0};
+
+    struct tm *packet_time;
+
+    packet_time = localtime(&(header->ts.tv_sec));
+    strftime(timestamp_1, TMP_BUFFER_SIZE - 1, "%FT%T", packet_time);
+    snprintf(timestamp_2, TMP_BUFFER_SIZE - 1, ".%.3ld", header->ts.tv_usec);
+    snprintf(timestamp_2_str, TMP_BUFFER_SIZE - 1, "%.4s", timestamp_2);
+    strftime(timestamp_3, TMP_BUFFER_SIZE - 1, "%z", packet_time);
+
+    strncat(timestamp_1, timestamp_2_str, TMP_BUFFER_SIZE - strlen(timestamp_1) - 1);
+    strncat(timestamp_1, timestamp_3, TMP_BUFFER_SIZE - strlen(timestamp_1) - 1);
+    printf("timestamp: %s\n", timestamp_1);
+}
+
+void print_macs(struct ether_header *eth_hdr)
+{
+    printf("src MAC: ");
+    for (int i = 0; i <= 5; i++)
+    {
+        printf("%02x", eth_hdr->ether_shost[i]);
+        if (i != 5)
+        {
+            printf(":");
+        }
+    }
+    printf("\n");
+
+    printf("dst MAC: ");
+    for (int i = 0; i <= 5; i++)
+    {
+        printf("%02x", eth_hdr->ether_dhost[i]);
+        if (i != 5)
+        {
+            printf(":");
+        }
+    }
+    printf("\n");
+}
+
+void print_packet(const unsigned char *packet, struct pcap_pkthdr *pkt_hdr)
+{
+    char buffer[TMP_BUFFER_SIZE] = {0};
+    for (bpf_u_int32 i = 0; i < pkt_hdr->caplen; i++)
+    {
+        printf("%02x ", packet[i]);
+
+        if (!isprint(packet[i]))
+        {
+            buffer[i % 8] = '.';
+        }
+        else
+        {
+            buffer[i % 8] = packet[i];
+        }
+
+        if (i % 8 == 7)
+        {
+            printf("\t%s\n", buffer);
+        }
+    }
+    if(pkt_hdr->caplen%8 != 0){
+        buffer[pkt_hdr->caplen%8] = 0;
+        for(bpf_u_int32 i = 0; i< 8 - pkt_hdr->caplen%8; i++){
+            printf("   ");
+        }
+        printf("\t%s\n", buffer);
+    }}
+
+int handle_ipv6(const unsigned char *packet)
+{
+    struct ip6_hdr *ipv6_hdr;
+    ipv6_hdr = (struct ip6_hdr *)packet + sizeof(struct ether_header);
+
+    switch (ipv6_hdr->ip6_nxt)
+    {
+    case IPPROTO_TCP:
+        struct tcphdr *tcp_hdr = (struct tcphdr *)(packet + sizeof(struct ether_header) + sizeof(struct ip6_hdr));
+        handle_tcp(packet, tcp_hdr);
+        break;
+    case IPPROTO_UDP:
+        struct udphdr *udp_hdr;
+        udp_hdr = (struct udphdr *)(packet + sizeof(struct ether_header) + sizeof(struct ip6_hdr));
+        handle_udp(packet, udp_hdr);
+        break;
+    case IPPROTO_ICMPV6:
+        handle_icmpv6(packet, ipv6_hdr);
+        break;
+    default:
+        printf("Unsupported IPv6 protocol: %d\n", ipv6_hdr->ip6_nxt);
+    }
+    return 0;
+}
+
+int handle_ipv4(const unsigned char *packet)
+{
+    struct iphdr *ip_hdr;
+    ip_hdr = (struct iphdr *)(packet + sizeof(struct ether_header));
+
+    switch (ip_hdr->protocol)
+    {
+    case IPPROTO_TCP:
+        struct tcphdr *tcp_hdr;
+        tcp_hdr = (struct tcphdr *)(packet + sizeof(struct ether_header) + sizeof(struct iphdr));
+        handle_tcp(packet, tcp_hdr);
+        break;
+    case IPPROTO_UDP:
+        struct udphdr *udp_hdr;
+        udp_hdr = (struct udphdr *)(packet + sizeof(struct ether_header) + sizeof(struct iphdr));
+        handle_udp(packet, udp_hdr);
+        break;
+    case IPPROTO_ICMP:
+        handle_icmpv4(packet, ip_hdr);
+        break;
+    default:
+        printf("Unsupported IPv4 protocol: %d\n", ip_hdr->protocol);
+    }
+    return 0;
+}
+
+int handle_arp(const unsigned char *packet, struct ether_header *eth_hdr)
+{
+    (void)packet;
+    (void)eth_hdr;
+    printf("ARP\n");
+    return 0;
+}
+
+int handle_tcp(const unsigned char *packet, struct tcphdr *tcp_hdr)
+{
+    (void)packet;
+    (void)tcp_hdr;
+    printf("TCP\n");
+    return 0;
+}
+int handle_udp(const unsigned char *packet, struct udphdr *udp_hdr)
+{
+    (void)packet;
+    (void)udp_hdr;
+    printf("UDP\n");
+    return 0;
+}
+
+int handle_icmpv4(const unsigned char *packet, struct iphdr *ip_hdr)
+{
+    (void)packet;
+    (void)ip_hdr;
+    printf("ICMPv4\n");
+    return 0;
+}
+
+int handle_icmpv6(const unsigned char *packet, struct ip6_hdr *ip6_hdr)
+{
+    (void)packet;
+    (void)ip6_hdr;
+    printf("ICMPv6\n");
+    return 0;
+}
+
 int sniff_packets(sniffer_settings_t *settings, char *filter)
 {
     char pcap_error_buffer[PCAP_ERRBUF_SIZE];
@@ -251,7 +416,7 @@ int sniff_packets(sniffer_settings_t *settings, char *filter)
         mask = 0;
     }
 
-    pcap_t *pcap_handle = pcap_open_live(settings->interface, BUFSIZ, 0, 1000, pcap_error_buffer);
+    pcap_t *pcap_handle = pcap_open_live(settings->interface, BUFSIZ, 1, 1000, pcap_error_buffer);
     if (pcap_handle == NULL)
     {
         fprintf(stderr, "Error while opening device %s for sniffing: %s\n", settings->interface, pcap_error_buffer);
@@ -279,15 +444,79 @@ int sniff_packets(sniffer_settings_t *settings, char *filter)
         return (2);
     }
 
-    struct pcap_pkthdr header;
-    const unsigned char *packet;
-    /* Grab a packet */
-    packet = pcap_next(pcap_handle, &header);
-    /* Print its length */
-    printf("Jacked a packet with length of [%d]\n", header.len);
-    /* And close the session */
+    long counter = 0;
+    while (counter < settings->num)
+    {
+
+        counter++;
+        const unsigned char *packet;
+        struct pcap_pkthdr header;
+
+        packet = pcap_next(pcap_handle, &header);
+
+        print_timestamp(&header);
+
+        struct ether_header *eth_hdr;
+        eth_hdr = (struct ether_header *)packet;
+
+        print_macs(eth_hdr);
+        printf("frame length: %d bytes\n", header.len);
+        switch (ntohs(eth_hdr->ether_type))
+        {
+        case ETHERTYPE_IPV6:
+            handle_ipv6(packet);
+            break;
+        case ETHERTYPE_IP:
+            handle_ipv4(packet);
+            break;
+        case ETHERTYPE_ARP:
+            handle_arp(packet, eth_hdr);
+            break;
+        default:
+            printf("Unsupported ether type: %d\n", ntohs(eth_hdr->ether_type));
+        }
+
+        /*
+        switch (ntohs(eth_hdr->ether_type))
+        {
+        case ETHERTYPE_IPV6:
+            struct ip6_hdr *ipv6_hdr;
+            ipv6_hdr = (struct ip6_hdr *)packet+sizeof(struct ether_header);
+            printf("ipv4\n");
+
+            switch(ipv6_hdr->ip6_nxt){
+                case IPPROTO_TCP:
+                    //ipv6_hdr->ip6_dst
+
+                    struct tcphdr *ipv6_tcphdr;
+                    ipv6_tcphdr = (struct tcphdr *)packet+sizeof(struct ether_header)+sizeof(struct ip6_hdr)
+                    break;
+                default:
+            }
+            printf("ipv6\n");
+            break;
+        case ETHERTYPE_IP:
+            struct iphdr *ip_hdr;
+            ip_hdr = (struct iphdr *)packet+sizeof(struct ether_header);
+            printf("ipv4\n");
+
+            switch(ip_hdr->protocol){
+                case IPPROTO_TCP:
+                    break;
+                default:
+            }
+            break;
+        case ETHERTYPE_ARP:
+            printf("arp\n");
+            break;
+        default:
+            printf("trash\n");
+        }
+    */
+        print_packet(packet, &header);
+    }
     pcap_close(pcap_handle);
-    return (0);
+    return 0;
 }
 
 int main(int argc, char **argv)
