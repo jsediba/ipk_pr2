@@ -497,17 +497,17 @@ void handle_ipv4(const unsigned char *packet)
     // Switch based on protocol
     switch (ip_hdr->protocol)
     {
-    case IPPROTO_TCP:
+    case IPPROTO_TCP:;
         struct tcphdr *tcp_hdr;
         tcp_hdr = (struct tcphdr *)(packet + sizeof(struct ether_header) + sizeof(struct iphdr));
         handle_tcp(tcp_hdr);
         break;
-    case IPPROTO_UDP:
+    case IPPROTO_UDP:;
         struct udphdr *udp_hdr;
         udp_hdr = (struct udphdr *)(packet + sizeof(struct ether_header) + sizeof(struct iphdr));
         handle_udp(udp_hdr);
         break;
-    case IPPROTO_ICMP:
+    case IPPROTO_ICMP:;
         struct icmphdr *icmp_hdr;
         icmp_hdr = (struct icmphdr *)(packet + sizeof(struct ether_header) + sizeof(struct iphdr));
         handle_icmp(icmp_hdr);
@@ -526,23 +526,23 @@ void handle_ipv6(const unsigned char *packet)
 {
     // Get ipv6 header
     struct ip6_hdr *ipv6_hdr;
-    ipv6_hdr = (struct ip6_hdr *)packet + sizeof(struct ether_header);
+    ipv6_hdr = (struct ip6_hdr *)(packet + sizeof(struct ether_header));
 
     print_ipv6s(ipv6_hdr);
 
     // switch based on protocol
     switch (ipv6_hdr->ip6_nxt)
     {
-    case IPPROTO_TCP:
+    case IPPROTO_TCP:;
         struct tcphdr *tcp_hdr = (struct tcphdr *)(packet + sizeof(struct ether_header) + sizeof(struct ip6_hdr));
         handle_tcp(tcp_hdr);
         break;
-    case IPPROTO_UDP:
+    case IPPROTO_UDP:;
         struct udphdr *udp_hdr;
         udp_hdr = (struct udphdr *)(packet + sizeof(struct ether_header) + sizeof(struct ip6_hdr));
         handle_udp(udp_hdr);
         break;
-    case IPPROTO_ICMPV6:
+    case IPPROTO_ICMPV6:;
         struct icmphdr *icmp_hdr;
         icmp_hdr = (struct icmphdr *)(packet + sizeof(struct ether_header) + sizeof(struct ip6_hdr));
         handle_icmp(icmp_hdr);
@@ -640,9 +640,10 @@ int setup_pcap_handle(sniffer_settings_t *settings, char *filter)
 
     if (pcap_lookupnet(settings->interface, &net, &mask, pcap_error_buffer) == -1)
     {
-        fprintf(stderr, "Error in pcap_lookupnet - interface: %s\n", settings->interface);
+        fprintf(stderr, "Interface not found: %s\n", settings->interface);
         net = 0;
         mask = 0;
+        return 1;
     }
 
     pcap_handle = pcap_open_live(settings->interface, BUFSIZ, 1, 1000, pcap_error_buffer);
