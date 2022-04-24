@@ -7,6 +7,7 @@ Na preklad programu je pripravený súbor Makefile a teda stačí spustiť nasle
 
 # Spúšťanie programu
 Nakoľko je možné, že na sledovanie packetov na sieti budú potrebné super user práva, je odporúčané ho spúšťať so `sudo`. Pre samotné spustenie použite:
+
 ```./ipk-sniffer [-i rozhranie | --interface rozhranie] {-p číslo_portu} {[--tcp|-t] [--udp|-u] [--arp] [--icmp]} {-n číslo}```
 
 Popis prepínačov je nasledovný:
