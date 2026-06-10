@@ -6,6 +6,7 @@
  */
 #include "ipk_sniffer.h"
 
+
 // pcap_handle and compiled filter need to be global for signal handling
 pcap_t *pcap_handle = NULL;
 struct bpf_program compiled_filter;

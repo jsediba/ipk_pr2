@@ -6,5 +6,6 @@ CFLAGS=-Wall -Wextra -g
 ipk_sniffer : ipk_sniffer.c ipk_sniffer.h
 	$(CC) $(CFLAGS) $^ -o $@ -lpcap
 
+
 clean:
 	rm ipk_sniffer

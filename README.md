@@ -27,4 +27,3 @@ Prepínače na úpravu filtrovania môžu byť ľubovoľne kombinované, a ak ni
 * ipk_sniffer.c - Súbor obsahujúci samotnú implementáciu programu
 * README.md     - Tento súbor
 * manual.pdf    - Dokumentácia ku projektu
-
